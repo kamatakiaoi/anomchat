@@ -29,6 +29,7 @@ public struct Post: Codable, Identifiable {
     public var postTitle: String { title ?? "" }
     public var postBody: String { body ?? "" }
     public var postTime: String { time ?? createdAt ?? "" }
+    public var postTags: [String] { tags ?? [] }
     public var viewCount: Int { views ?? 0 }
     public var commentCount: Int { comments ?? 0 }
     public var currentScore: Int { score ?? 0 }
