@@ -1,0 +1,7 @@
+[2026-08-26T17:46:27.752Z] QuickHash startup scan: indexed 117 unique file(s), deleted 0 duplicate file(s) saving 0 B
+[2026-08-26T17:46:27.763Z] Anonymous Chat running at http://localhost:25222
+[2026-08-26T17:46:27.764Z] Log file: C:\Users\flooxie\Downloads\Compressed\code\logs\27-08-2026-00-46-25.txt
+[2026-08-26T17:46:42.949Z] Connection: socketId=1Mq4ZY ip=::1
+[2026-08-26T17:46:42.954Z] Auto-login: "RapidFalcon59" ip=::1 userIp=key-49cd74abcd8c1cda
+[2026-08-26T17:46:42.984Z] Login: "RapidFalcon59" ip=::1 userIp=key-49cd74abcd8c1cda
+[2026-08-26T17:48:58.823Z] Login: "RapidFalcon59" ip=::1 userIp=key-49cd74abcd8c1cda

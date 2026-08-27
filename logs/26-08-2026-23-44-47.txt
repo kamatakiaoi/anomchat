@@ -1,0 +1,8 @@
+[2026-08-26T16:44:50.030Z] QuickHash startup scan: indexed 116 unique file(s), deleted 50 duplicate file(s) saving 145.13 MB
+[2026-08-26T16:44:50.039Z] Anonymous Chat running at http://localhost:25222
+[2026-08-26T16:44:50.039Z] Log file: C:\Users\flooxie\Downloads\Compressed\code\logs\26-08-2026-23-44-47.txt
+[2026-08-26T16:44:57.910Z] Connection: socketId=wpwJUp ip=::1
+[2026-08-26T16:44:57.913Z] Auth failed: invalid key from ip=::1
+[2026-08-26T16:44:57.923Z] Auth failed: invalid key from ip=::1
+[2026-08-26T16:45:02.379Z] Registered: "RapidFalcon59" ip=::1 userIp=key-49cd74abcd8c1cda
+[2026-08-26T16:49:10.039Z] Login: "RapidFalcon59" ip=::1 userIp=key-49cd74abcd8c1cda
