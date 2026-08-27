@@ -8,12 +8,16 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     private var timeObserver: Any?
 
     @Published public var currentUrl: String?
+    public var currentPlayingUrl: String? { return currentUrl }
     @Published public var isPlaying: Bool = false
     @Published public var currentTime: Double = 0
     @Published public var duration: Double = 0
 
     private override init() {
         super.init()
+    }
+
+    private func setupAudioSession() {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
     }
@@ -23,6 +27,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             if isPlaying {
                 pause()
             } else {
+                setupAudioSession()
                 player?.play()
                 isPlaying = true
             }
@@ -33,6 +38,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         guard let url = URL(string: urlStr) else { return }
         currentUrl = urlStr
 
+        setupAudioSession()
         let item = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: item)
         player?.play()
@@ -40,7 +46,8 @@ public class AudioPlayerManager: NSObject, ObservableObject {
 
         NotificationCenter.default.addObserver(self, selector: #selector(playerItemDidReachEnd), name: .AVPlayerItemDidPlayToEndTime, object: item)
 
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
+        // 0.25s interval is battery efficient and keeps progress bar visually smooth
+        timeObserver = player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] time in
             guard let self = self else { return }
             self.currentTime = time.seconds
             if let d = self.player?.currentItem?.duration.seconds, !d.isNaN && d > 0 {
@@ -66,6 +73,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         isPlaying = false
         currentTime = 0
         duration = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     public func seek(to progress: Double) {
@@ -78,5 +86,6 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     @objc private func playerItemDidReachEnd() {
         isPlaying = false
         currentTime = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 }

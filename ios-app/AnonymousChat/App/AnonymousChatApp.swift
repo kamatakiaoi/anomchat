@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct AnonymousChatApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var socketManager = SocketManager.shared
     @StateObject private var prefs = PreferenceManager.shared
     @StateObject private var notifManager = NotificationManager.shared
@@ -14,22 +15,41 @@ struct AnonymousChatApp: App {
                     socketManager.connect()
                 }
         }
+        .onChange(of: scenePhase) { newPhase in
+            switch newPhase {
+            case .background:
+                socketManager.appDidEnterBackground()
+            case .active:
+                socketManager.appWillEnterForeground()
+            case .inactive:
+                break
+            @unknown default:
+                break
+            }
+        }
     }
 }
 
 public struct ContentView: View {
     @ObservedObject var socketManager = SocketManager.shared
     @ObservedObject var prefs = PreferenceManager.shared
+    @ObservedObject var notifManager = NotificationManager.shared
 
     public var body: some View {
-        Group {
-            if socketManager.myProfile != nil {
-                MainLobbyView()
-            } else {
-                AuthView()
+        ZStack {
+            Group {
+                if socketManager.myProfile != nil {
+                    MainLobbyView()
+                } else {
+                    AuthView()
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: socketManager.myProfile != nil)
+
+            if let banner = notifManager.activeBanner {
+                InAppNotificationBannerView(banner: banner)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: socketManager.myProfile != nil)
     }
 }
 

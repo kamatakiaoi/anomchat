@@ -40,6 +40,8 @@ public class PreferenceManager: ObservableObject {
         didSet { defaults.set(isSoundEnabled, forKey: keySoundEnabled) }
     }
 
+    @Published public var deviceMac: String
+
     private init() {
         let savedHost = defaults.string(forKey: keyServerHost) ?? PreferenceManager.defaultServerHost
         let savedPort = defaults.integer(forKey: keyServerPort)
@@ -49,10 +51,28 @@ public class PreferenceManager: ObservableObject {
         self.recoveryKey = defaults.string(forKey: keyRecoveryKey)
         self.timezone = defaults.string(forKey: keyTimezone) ?? "vn"
         self.isSoundEnabled = defaults.object(forKey: keySoundEnabled) == nil ? true : defaults.bool(forKey: keySoundEnabled)
+
+        // Initialize MAC address
+        if let existingMac = defaults.string(forKey: keyDeviceMac), !existingMac.isEmpty {
+            self.deviceMac = existingMac
+        } else {
+            var bytes = [String]()
+            for _ in 0..<6 {
+                let val = Int.random(in: 0...255)
+                bytes.append(String(format: "%02X", val))
+            }
+            let newMac = "MAC-" + bytes.joined(separator: ":")
+            defaults.set(newMac, forKey: keyDeviceMac)
+            self.deviceMac = newMac
+        }
     }
 
     public func getDeviceMac() -> String {
+        if !deviceMac.isEmpty {
+            return deviceMac
+        }
         if let mac = defaults.string(forKey: keyDeviceMac), !mac.isEmpty {
+            self.deviceMac = mac
             return mac
         }
         var bytes = [String]()
@@ -62,6 +82,7 @@ public class PreferenceManager: ObservableObject {
         }
         let newMac = "MAC-" + bytes.joined(separator: ":")
         defaults.set(newMac, forKey: keyDeviceMac)
+        self.deviceMac = newMac
         return newMac
     }
 
