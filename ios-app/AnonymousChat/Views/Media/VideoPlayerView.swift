@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import UIKit
 import Combine
 
 public struct VideoPlayerView: View {
@@ -254,27 +255,27 @@ public struct VideoPlayerView: View {
 
     private func applyOrientation(isLandscape: Bool) {
         if #available(iOS 16.0, *) {
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            let scenes = UIApplication.shared.connectedScenes
+            if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene ?? scenes.first as? UIWindowScene {
                 let mask: UIInterfaceOrientationMask = isLandscape ? .landscapeRight : .portrait
-                windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { error in
-                    print("Geometry update notice: \(error.localizedDescription)")
-                }
+                let geometryPreferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
+                windowScene.requestGeometryUpdate(geometryPreferences) { _ in }
             }
         } else {
             let val = isLandscape ? UIInterfaceOrientation.landscapeRight.rawValue : UIInterfaceOrientation.portrait.rawValue
             UIDevice.current.setValue(val, forKey: "orientation")
-            UIViewController.attemptRotationToDeviceOrientation()
         }
     }
 
     private func restorePortraitOrientation() {
         if #available(iOS 16.0, *) {
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-                windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+            let scenes = UIApplication.shared.connectedScenes
+            if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene ?? scenes.first as? UIWindowScene {
+                let geometryPreferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: .portrait)
+                windowScene.requestGeometryUpdate(geometryPreferences) { _ in }
             }
         } else {
             UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
-            UIViewController.attemptRotationToDeviceOrientation()
         }
     }
 
