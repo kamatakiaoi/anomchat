@@ -1,11 +1,15 @@
 import SwiftUI
 
-public struct ExplorePostRowView: View {
+public struct ExplorePostRowView: View, Equatable {
     public let post: Post
     public let onSelect: () -> Void
 
-    @ObservedObject var socketManager = SocketManager.shared
-    @ObservedObject var prefs = PreferenceManager.shared
+    public static func == (lhs: ExplorePostRowView, rhs: ExplorePostRowView) -> Bool {
+        return lhs.post == rhs.post
+    }
+
+    private let socketManager = SocketManager.shared
+    private let prefs = PreferenceManager.shared
     @State private var showDeleteConfirm: Bool = false
     @State private var showToastMessage: String?
     @State private var selectedVideoUrl: URL?

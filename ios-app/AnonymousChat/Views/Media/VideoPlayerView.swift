@@ -32,9 +32,13 @@ public struct VideoPlayerView: View {
                 if let player = player {
                     NativeVideoRepresentable(player: player)
                         .ignoresSafeArea()
-                        .onTapGesture {
-                            toggleControls()
-                        }
+                        .overlay(
+                            Color.black.opacity(0.001)
+                                .ignoresSafeArea()
+                                .onTapGesture {
+                                    toggleControls()
+                                }
+                        )
                 } else {
                     ProgressView().tint(.white)
                 }
@@ -205,7 +209,13 @@ public struct VideoPlayerView: View {
     // MARK: - Player Setup & Teardown
     private func setupPlayer() {
         if player == nil {
-            let p = AVPlayer(url: videoUrl)
+            let asset = AVURLAsset(url: videoUrl, options: ["AVURLAssetPreferPreciseDurationAndTimingKey": false])
+            let item = AVPlayerItem(asset: asset)
+            item.preferredForwardBufferDuration = 3.0
+            
+            let p = AVPlayer(playerItem: item)
+            p.automaticallyWaitsToMinimizeStalling = true
+            
             self.player = p
             p.isMuted = isMuted
 
@@ -219,7 +229,7 @@ public struct VideoPlayerView: View {
                 }
             }
 
-            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: p.currentItem, queue: .main) { _ in
+            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
                 self.player?.seek(to: .zero)
                 self.isPlaying = false
                 self.showControls = true

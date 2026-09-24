@@ -35,15 +35,21 @@ public struct PostDetailView: View {
         }
         .background(Color(hex: "#0A0A0A").ignoresSafeArea())
         .navigationBarHidden(true)
-        .sheet(item: $socketManager.inspectedUserProfile) { userProf in
-            UserProfileSheet(profile: userProf)
-        }
-        .fullScreenCover(item: Binding(
-            get: { activeLightboxUrl != nil ? IdentifiableURL(url: activeLightboxUrl!) : nil },
-            set: { if $0 == nil { activeLightboxUrl = nil } }
-        )) { idUrl in
-            LightboxView(mediaUrl: idUrl.url)
-        }
+        .background(
+            EmptyView()
+                .sheet(item: $socketManager.inspectedUserProfile) { userProf in
+                    UserProfileSheet(profile: userProf)
+                }
+        )
+        .background(
+            EmptyView()
+                .fullScreenCover(item: Binding(
+                    get: { activeLightboxUrl != nil ? IdentifiableURL(url: activeLightboxUrl!) : nil },
+                    set: { if $0 == nil { activeLightboxUrl = nil } }
+                )) { idUrl in
+                    LightboxView(mediaUrl: idUrl.url)
+                }
+        )
         .alert("Delete Post", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 socketManager.deleteExplorePost(postId: currentPost.id)
@@ -373,10 +379,12 @@ public struct PostDetailView: View {
                         Text("Replying to \(rep.authorName)")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(Color(hex: "#38BDF8"))
+                            .lineLimit(1)
                         Text(rep.commentBody.isEmpty ? "[Media]" : rep.commentBody)
                             .font(.system(size: 12))
                             .foregroundColor(Color(hex: "#A1A1AA"))
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     }
 
                     Spacer()

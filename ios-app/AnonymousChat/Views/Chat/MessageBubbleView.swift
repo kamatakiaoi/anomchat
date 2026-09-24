@@ -1,12 +1,16 @@
 import SwiftUI
 
-public struct MessageBubbleView: View {
+public struct MessageBubbleView: View, Equatable {
     public let message: Message
     public let onReply: () -> Void
     public let onInspectUser: () -> Void
 
-    @ObservedObject var socketManager = SocketManager.shared
-    @ObservedObject var prefs = PreferenceManager.shared
+    public static func == (lhs: MessageBubbleView, rhs: MessageBubbleView) -> Bool {
+        return lhs.message == rhs.message
+    }
+
+    private let socketManager = SocketManager.shared
+    private let prefs = PreferenceManager.shared
     @State private var showLightbox: Bool = false
     @State private var selectedMediaUrl: URL?
 
@@ -21,11 +25,13 @@ public struct MessageBubbleView: View {
            let msgId = message.userId, !msgId.isEmpty {
             return myId == msgId
         }
-        // 3. Name check (fallback when name is customized and not default Anon)
+        // 3. Name & Color check (fallback for legacy messages without uid)
         if let myName = socketManager.myProfile?.name, !myName.isEmpty,
-           myName.lowercased() != "anon",
-           myName.lowercased() == message.authorName.lowercased() {
-            return true
+           let myColor = socketManager.myProfile?.color, !myColor.isEmpty {
+            if myName.lowercased() == message.authorName.lowercased() &&
+               myColor == message.authorColor {
+                return true
+            }
         }
         return false
     }

@@ -76,6 +76,7 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
             self.reconnectTimer = nil
             self.authTimeoutTimer?.invalidate()
             self.authTimeoutTimer = nil
+            self.disconnect(manual: false)
         }
     }
 
@@ -227,10 +228,15 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
             self.pingMs = 0
 
             if !self.isManualDisconnect {
+                if UIApplication.shared.applicationState == .background {
+                    return
+                }
                 self.reconnectTimer?.invalidate()
                 self.reconnectTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
                     guard let self = self, !self.isManualDisconnect, !self.isConnectedInternal else { return }
-                    self.connect()
+                    if UIApplication.shared.applicationState != .background {
+                        self.connect()
+                    }
                 }
             }
         }

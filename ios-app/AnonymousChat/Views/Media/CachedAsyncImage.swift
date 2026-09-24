@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 
 public class ImageCache {
     public static let shared = ImageCache()
@@ -6,7 +7,7 @@ public class ImageCache {
 
     private init() {
         cache.countLimit = 150
-        cache.totalCostLimit = 60 * 1024 * 1024 // 60MB memory limit
+        cache.totalCostLimit = 100 * 1024 * 1024 // 100MB memory limit
     }
 
     public func get(for url: URL) -> UIImage? {
@@ -76,17 +77,31 @@ public struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                 return
             }
 
-            DispatchQueue.global(qos: .userInitiated).async {
-                guard let decodedImage = UIImage(data: data) else {
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.hasFailed = true
-                    }
+            DispatchQueue.global(qos: .userInteractive).async {
+                // Downsample using ImageIO to prevent huge memory spikes and lag
+                let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+                guard let imageSource = CGImageSourceCreateWithData(data as CFData, imageSourceOptions) else {
+                    DispatchQueue.main.async { self.isLoading = false; self.hasFailed = true }
                     return
                 }
 
+                // 800px max dimension is optimal for chat/explore without pixelation on Retina
+                let downsampleOptions = [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceShouldCacheImmediately: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 800
+                ] as CFDictionary
+
+                guard let downsampledImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions) else {
+                    DispatchQueue.main.async { self.isLoading = false; self.hasFailed = true }
+                    return
+                }
+
+                let finalImage = UIImage(cgImage: downsampledImage)
+                
                 // Pre-render to prevent main thread decoding lag during scrolling
-                let prepared = decodedImage.preparingForDisplay() ?? decodedImage
+                let prepared = finalImage.preparingForDisplay() ?? finalImage
                 ImageCache.shared.set(prepared, for: url)
 
                 DispatchQueue.main.async {

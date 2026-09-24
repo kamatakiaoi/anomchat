@@ -25,9 +25,12 @@ public struct InlineVideoPlayerView: View {
 
             if let player = player {
                 NativeVideoRepresentable(player: player)
-                    .onTapGesture {
-                        toggleControls()
-                    }
+                    .overlay(
+                        Color.black.opacity(0.001)
+                            .onTapGesture {
+                                toggleControls()
+                            }
+                    )
             } else {
                 ZStack {
                     Color(hex: "#18181B")
@@ -130,7 +133,13 @@ public struct InlineVideoPlayerView: View {
 
     private func setupPlayer() {
         if player == nil {
-            let p = AVPlayer(url: videoUrl)
+            let asset = AVURLAsset(url: videoUrl, options: ["AVURLAssetPreferPreciseDurationAndTimingKey": false])
+            let item = AVPlayerItem(asset: asset)
+            item.preferredForwardBufferDuration = 3.0 // Buffer 3 seconds instead of full file
+            
+            let p = AVPlayer(playerItem: item)
+            p.automaticallyWaitsToMinimizeStalling = true
+            
             self.player = p
             p.isMuted = isMuted
 
@@ -142,7 +151,7 @@ public struct InlineVideoPlayerView: View {
                 }
             }
 
-            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: p.currentItem, queue: .main) { _ in
+            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
                 self.player?.seek(to: .zero)
                 self.isPlaying = false
                 self.showControls = true

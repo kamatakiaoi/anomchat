@@ -1,11 +1,15 @@
 import SwiftUI
 
-public struct CommentRowView: View {
+public struct CommentRowView: View, Equatable {
     public let comment: Comment
     public let onReply: () -> Void
 
-    @ObservedObject var socketManager = SocketManager.shared
-    @ObservedObject var prefs = PreferenceManager.shared
+    public static func == (lhs: CommentRowView, rhs: CommentRowView) -> Bool {
+        return lhs.comment == rhs.comment
+    }
+
+    private let socketManager = SocketManager.shared
+    private let prefs = PreferenceManager.shared
 
     public var isReply: Bool {
         return (comment.parentId ?? 0) > 0

@@ -39,8 +39,20 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         currentUrl = urlStr
 
         setupAudioSession()
-        let item = AVPlayerItem(url: url)
+        
+        // Optimizations for FLAC/WAV/OGG fast loading and chunk buffering
+        let asset = AVURLAsset(url: url, options: [
+            "AVURLAssetPreferPreciseDurationAndTimingKey": false
+        ])
+        
+        let item = AVPlayerItem(asset: asset)
+        // Stream in chunks rather than trying to download the whole uncompressed file
+        if #available(iOS 10.0, *) {
+            item.preferredForwardBufferDuration = 3.0
+        }
+        
         player = AVPlayer(playerItem: item)
+        player?.automaticallyWaitsToMinimizeStalling = true
         player?.play()
         isPlaying = true
 

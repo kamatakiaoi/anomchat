@@ -45,22 +45,31 @@ public struct ChatRoomView: View {
         }
         .background(Color(hex: "#0A0A0A").ignoresSafeArea())
         .navigationBarHidden(true)
-        .sheet(isPresented: $showMediaPicker) {
-            ImagePicker(
-                selectedImages: $selectedImages,
-                maxSelectionCount: max(1, 5 - attachedBase64Images.count),
-                allowVideos: true,
-                onVideoPicked: { b64 in
-                    attachedVideoBase64 = b64
+        .background(
+            EmptyView()
+                .sheet(isPresented: $showMediaPicker) {
+                    ImagePicker(
+                        selectedImages: $selectedImages,
+                        maxSelectionCount: max(1, 5 - attachedBase64Images.count),
+                        allowVideos: true,
+                        onVideoPicked: { b64 in
+                            attachedVideoBase64 = b64
+                        }
+                    )
                 }
-            )
-        }
-        .sheet(isPresented: $showOnlineSheet) {
-            OnlineMembersSheet()
-        }
-        .sheet(item: $socketManager.inspectedUserProfile) { userProf in
-            UserProfileSheet(profile: userProf)
-        }
+        )
+        .background(
+            EmptyView()
+                .sheet(isPresented: $showOnlineSheet) {
+                    OnlineMembersSheet()
+                }
+        )
+        .background(
+            EmptyView()
+                .sheet(item: $socketManager.inspectedUserProfile) { userProf in
+                    UserProfileSheet(profile: userProf)
+                }
+        )
         .onChange(of: selectedImages) { images in
             DispatchQueue.global(qos: .userInitiated).async {
                 for img in images {
@@ -218,6 +227,7 @@ public struct ChatRoomView: View {
                                 }
                             }
                         )
+                        .equatable()
                         .id(msg.id)
                     }
                 }
