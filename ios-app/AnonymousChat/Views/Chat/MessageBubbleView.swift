@@ -190,26 +190,7 @@ public struct MessageBubbleView: View, Equatable {
 
             // Attached Audio
             if let aud = message.audio, let audUrl = MediaUtils.getFullMediaUrl(serverBaseUrl: prefs.serverBaseUrl, mediaPath: aud) {
-                let isCurPlaying = AudioPlayerManager.shared.currentPlayingUrl == audUrl.absoluteString && AudioPlayerManager.shared.isPlaying
-                HStack(spacing: 8) {
-                    Button(action: {
-                        AudioPlayerManager.shared.playOrPause(urlStr: audUrl.absoluteString)
-                    }) {
-                        Image(systemName: isCurPlaying ? "pause.circle.fill" : "play.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(.white)
-                    }
-                    Text("Voice Note")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
-                }
-                .padding(8)
-                .background(Color(hex: "#141416"))
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color(hex: "#27272A"), lineWidth: 1)
-                )
+                AudioMessageView(audioUrl: audUrl.absoluteString)
             }
 
             // Message Text: Never truncated, full markdown rendering
@@ -258,5 +239,33 @@ public struct MessageBubbleView: View, Equatable {
                 Label("View Profile", systemImage: "person.circle")
             }
         }
+    }
+}
+
+public struct AudioMessageView: View {
+    public let audioUrl: String
+    @ObservedObject var audioPlayer = AudioPlayerManager.shared
+
+    public var body: some View {
+        let isCurPlaying = audioPlayer.currentPlayingUrl == audioUrl && audioPlayer.isPlaying
+        HStack(spacing: 8) {
+            Button(action: {
+                audioPlayer.playOrPause(urlStr: audioUrl)
+            }) {
+                Image(systemName: isCurPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(.white)
+            }
+            Text("Voice Note")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white)
+        }
+        .padding(8)
+        .background(Color(hex: "#141416"))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(hex: "#27272A"), lineWidth: 1)
+        )
     }
 }
