@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Post: Codable, Identifiable {
+public struct Post: Codable, Identifiable, Equatable {
     public var id: Int
     public var userId: String?
     public var uid: String?
@@ -81,7 +81,7 @@ public struct Post: Codable, Identifiable {
     }
 }
 
-public struct Comment: Codable, Identifiable {
+public struct Comment: Codable, Identifiable, Equatable {
     public var id: Int
     public var postId: Int?
     public var userId: String?
