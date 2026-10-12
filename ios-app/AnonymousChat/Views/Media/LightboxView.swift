@@ -70,19 +70,18 @@ public struct LightboxView: View {
                 }
             }
 
-                // Top Close Button
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 30))
-                                .foregroundColor(.white.opacity(0.85))
-                                .padding(16)
-                        }
-                    }
+            // Top Close Button
+            VStack {
+                HStack {
                     Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.white.opacity(0.85))
+                            .padding(16)
+                    }
                 }
+                Spacer()
             }
         }
     }
