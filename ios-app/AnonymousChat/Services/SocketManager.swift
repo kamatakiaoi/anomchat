@@ -53,7 +53,9 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
     private override init() {
         super.init()
         let config = URLSessionConfiguration.default
-        config.waitsForConnectivity = true
+        config.waitsForConnectivity = false
+        config.networkServiceType = .responsiveData
+        config.timeoutIntervalForRequest = 8.0
         self.session = URLSession(configuration: config, delegate: self, delegateQueue: OperationQueue())
 
         // Hydrate from local cache immediately for 0ms initial render
@@ -162,7 +164,8 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
 
         var request = URLRequest(url: wsUrl)
         request.setValue(deviceMac, forHTTPHeaderField: "x-client-mac")
-        request.timeoutInterval = 10
+        request.networkServiceType = .responsiveData
+        request.timeoutInterval = 8.0
         webSocketTask = session?.webSocketTask(with: request)
         webSocketTask?.resume()
 
@@ -253,7 +256,11 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
             let deviceMac = PreferenceManager.shared.getDeviceMac()
             let connectPayload = "40{\"token\":\"\",\"mac\":\"\(deviceMac)\"}"
             sendRaw(connectPayload)
+            return
+        }
 
+        if raw.hasPrefix("40") {
+            // Socket.IO namespace connection established
             DispatchQueue.main.async { [weak self] in
                 guard let self = self, self.currentConnectionId == connectionId else { return }
                 self.isConnected = true
@@ -265,8 +272,6 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
                 if let pending = self.pendingAuthAction {
                     self.pendingAuthAction = nil
                     pending()
-                } else if let savedKey = PreferenceManager.shared.authKey, !savedKey.isEmpty {
-                    self.authKey(key: savedKey)
                 }
 
                 self.getTopics()
@@ -301,7 +306,33 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
         DispatchQueue.main.async { [weak self] in
             guard let self = self, self.currentConnectionId == connectionId else { return }
 
+            if !self.isConnectedInternal {
+                self.isConnected = true
+                self.isConnecting = false
+                self.isConnectedInternal = true
+                self.startPingTimer()
+            }
+
             switch eventName {
+            case "auto-auth":
+                if let dict = payload as? [String: Any],
+                   let key = dict["key"] as? String, !key.isEmpty {
+                    PreferenceManager.shared.authKey = key
+                }
+                self.authTimeoutTimer?.invalidate()
+                self.authTimeoutTimer = nil
+                self.isAuthenticating = false
+                self.authErrorMessage = nil
+
+            case "require-auth":
+                if let savedKey = PreferenceManager.shared.authKey, !savedKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    self.authKey(key: savedKey)
+                } else {
+                    self.authTimeoutTimer?.invalidate()
+                    self.authTimeoutTimer = nil
+                    self.isAuthenticating = false
+                }
+
             case "pong-check":
                 if self.pingStartTime > 0 {
                     self.pingMs = max(1, Int((Date().timeIntervalSince1970 * 1000) - self.pingStartTime))

@@ -18,7 +18,7 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     }
 
     private func setupAudioSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
         try? AVAudioSession.sharedInstance().setActive(true)
     }
 
@@ -86,7 +86,6 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         isPlaying = false
         currentTime = 0
         duration = 0
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     public func seek(toSeconds: Double) {
@@ -110,6 +109,5 @@ public class AudioPlayerManager: NSObject, ObservableObject {
     @objc private func playerItemDidReachEnd() {
         isPlaying = false
         currentTime = 0
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 }

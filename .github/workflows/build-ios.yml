@@ -57,6 +57,6 @@ jobs:
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AnonymousChat-v3.6.6-iOS.ipa
+          name: AnonymousChat-v3.6.9-iOS.ipa
           path: ios-app/AnonymousChat.ipa
           retention-days: 30

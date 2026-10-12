@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     static var orientationLock: UIInterfaceOrientationMask = .portrait
@@ -15,6 +16,12 @@ struct AnonymousChatApp: App {
     @StateObject private var socketManager = SocketManager.shared
     @StateObject private var prefs = PreferenceManager.shared
     @StateObject private var notifManager = NotificationManager.shared
+
+    init() {
+        // Enforce .playback audio category from app launch so Silent Mode never mutes sound
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
 
     var body: some Scene {
         WindowGroup {

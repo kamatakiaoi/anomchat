@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import AVFoundation
 
 public struct InlineVideoPlayerView: View {
     public let videoUrl: URL
@@ -133,6 +134,8 @@ public struct InlineVideoPlayerView: View {
 
     private func setupPlayer() {
         if player == nil {
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+            try? AVAudioSession.sharedInstance().setActive(true)
             let asset = AVURLAsset(url: videoUrl, options: ["AVURLAssetPreferPreciseDurationAndTimingKey": false])
             let item = AVPlayerItem(asset: asset)
             item.preferredForwardBufferDuration = 1.0
