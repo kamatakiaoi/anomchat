@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Topic: Codable, Identifiable {
+public struct Topic: Codable, Identifiable, Equatable {
     public var id: Int
     public var name: String
     public var msgCount: Int?
@@ -13,7 +13,7 @@ public struct Topic: Codable, Identifiable {
     public var recommended: Bool?
     public var lastMsg: LastMessage?
 
-    public struct LastMessage: Codable {
+    public struct LastMessage: Codable, Equatable {
         public var id: Int?
         public var name: String?
         public var text: String?

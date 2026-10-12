@@ -177,24 +177,6 @@ public struct VideoPlayerView: View {
                     .transition(.opacity)
                 }
             }
-            .offset(y: dragOffset.height > 0 ? dragOffset.height : 0)
-            .gesture(
-                DragGesture()
-                    .onChanged { gesture in
-                        if gesture.translation.height > 0 {
-                            dragOffset = gesture.translation
-                        }
-                    }
-                    .onEnded { gesture in
-                        if gesture.translation.height > 120 {
-                            closePlayer()
-                        } else {
-                            withAnimation(.spring()) {
-                                dragOffset = .zero
-                            }
-                        }
-                    }
-            )
         }
         .statusBar(hidden: isLandscape || !showControls)
         .onAppear {
@@ -211,10 +193,11 @@ public struct VideoPlayerView: View {
         if player == nil {
             let asset = AVURLAsset(url: videoUrl, options: ["AVURLAssetPreferPreciseDurationAndTimingKey": false])
             let item = AVPlayerItem(asset: asset)
-            item.preferredForwardBufferDuration = 3.0
+            item.preferredForwardBufferDuration = 1.0
+            item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
             
             let p = AVPlayer(playerItem: item)
-            p.automaticallyWaitsToMinimizeStalling = true
+            p.automaticallyWaitsToMinimizeStalling = false
             
             self.player = p
             p.isMuted = isMuted
@@ -264,6 +247,7 @@ public struct VideoPlayerView: View {
     }
 
     private func applyOrientation(isLandscape: Bool) {
+        AppDelegate.orientationLock = isLandscape ? .landscapeRight : .portrait
         if #available(iOS 16.0, *) {
             let scenes = UIApplication.shared.connectedScenes
             if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene ?? scenes.first as? UIWindowScene {
@@ -271,22 +255,21 @@ public struct VideoPlayerView: View {
                 let geometryPreferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
                 windowScene.requestGeometryUpdate(geometryPreferences) { _ in }
             }
-        } else {
-            let val = isLandscape ? UIInterfaceOrientation.landscapeRight.rawValue : UIInterfaceOrientation.portrait.rawValue
-            UIDevice.current.setValue(val, forKey: "orientation")
         }
+        let val = isLandscape ? UIInterfaceOrientation.landscapeRight.rawValue : UIInterfaceOrientation.portrait.rawValue
+        UIDevice.current.setValue(val, forKey: "orientation")
     }
 
     private func restorePortraitOrientation() {
+        AppDelegate.orientationLock = .portrait
         if #available(iOS 16.0, *) {
             let scenes = UIApplication.shared.connectedScenes
             if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene ?? scenes.first as? UIWindowScene {
                 let geometryPreferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: .portrait)
                 windowScene.requestGeometryUpdate(geometryPreferences) { _ in }
             }
-        } else {
-            UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
         }
+        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
     }
 
     // MARK: - Playback Controls
@@ -306,7 +289,7 @@ public struct VideoPlayerView: View {
 
     private func seek(to seconds: Double) {
         let time = CMTime(seconds: seconds, preferredTimescale: 600)
-        player?.seek(to: time)
+        player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     private func seekRelative(_ delta: Double) {

@@ -49,6 +49,7 @@ jobs:
         run: |
           mkdir -p build/Payload
           cp -r build/Release-iphoneos/AnonymousChat.app build/Payload/
+          codesign --force --deep --sign - --entitlements AnonymousChat/AnonymousChat.entitlements build/Payload/AnonymousChat.app || true
           cd build
           zip -r ../AnonymousChat.ipa Payload/
           cd ..

@@ -17,6 +17,11 @@ public struct ChatRoomView: View {
     @State private var attachedBase64Images: [String] = []
     @State private var attachedVideoBase64: String?
     @State private var attachedAudioBase64: String?
+    @State private var highlightedMsgId: Int? = nil
+    @State private var initialScrollDone: Bool = false
+    @State private var lastKnownMessageId: Int? = nil
+    @State private var isPrependingHistory: Bool = false
+    @State private var previousTopMsgId: String? = nil
 
     public var isTopicLocked: Bool {
         return socketManager.currentTopic?.isLocked ?? topic.isLocked
@@ -201,19 +206,32 @@ public struct ChatRoomView: View {
                     if socketManager.hasMoreHistory {
                         Button(action: {
                             if let firstMsg = socketManager.chatMessages.first, let fId = firstMsg.msgId {
+                                previousTopMsgId = "msg-\(fId)"
+                                isPrependingHistory = true
                                 socketManager.loadHistory(beforeId: fId)
                             }
                         }) {
-                            Text("Load older messages")
-                                .font(.system(size: 12.5, weight: .medium))
-                                .foregroundColor(Color(hex: "#38BDF8"))
-                                .padding(.vertical, 8)
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 13))
+                                Text("Load older messages")
+                                    .font(.system(size: 12.5, weight: .semibold))
+                            }
+                            .foregroundColor(Color(hex: "#38BDF8"))
+                            .padding(.vertical, 7)
+                            .padding(.horizontal, 14)
+                            .background(Color(hex: "#18181B"))
+                            .cornerRadius(16)
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#27272A"), lineWidth: 1))
                         }
+                        .padding(.vertical, 4)
                     }
 
                     ForEach(socketManager.chatMessages) { msg in
+                        let scrollId = msg.msgId != nil ? "msg-\(msg.msgId!)" : msg.id
                         MessageBubbleView(
                             message: msg,
+                            isHighlighted: highlightedMsgId != nil && msg.msgId == highlightedMsgId,
                             onReply: {
                                 withAnimation(.easeInOut(duration: 0.18)) {
                                     replyingToMessage = msg
@@ -225,11 +243,19 @@ public struct ChatRoomView: View {
                                 } else if let userId = msg.userId, !userId.isEmpty {
                                     socketManager.requestUserProfile(uid: userId)
                                 }
+                            },
+                            onJumpToReply: { targetMsgId in
+                                jumpToMessageId(targetMsgId, proxy: proxy)
                             }
                         )
                         .equatable()
-                        .id(msg.id)
+                        .id(scrollId)
                     }
+
+                    // Pinned bottom anchor for absolute true-latest alignment
+                    Color.clear
+                        .frame(height: 1)
+                        .id("BOTTOM_ANCHOR")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -237,15 +263,86 @@ public struct ChatRoomView: View {
             .onTapGesture {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
+            .onAppear {
+                performInitialBottomScroll(proxy: proxy)
+            }
             .onChange(of: socketManager.chatMessages.count) { _ in
-                if let last = socketManager.chatMessages.last {
-                    DispatchQueue.main.async {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            proxy.scrollTo(last.id, anchor: .bottom)
+                handleMessagesCountChange(proxy: proxy)
+            }
+            .onChange(of: socketManager.jumpedTargetMsgId) { targetId in
+                if let targetId = targetId {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        proxy.scrollTo("msg-\(targetId)", anchor: .center)
+                    }
+                    highlightedMsgId = targetId
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation {
+                            if highlightedMsgId == targetId {
+                                highlightedMsgId = nil
+                            }
                         }
+                        socketManager.jumpedTargetMsgId = nil
                     }
                 }
             }
+        }
+    }
+
+    private func performInitialBottomScroll(proxy: ScrollViewProxy) {
+        // Immediate scroll to bottom
+        proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
+
+        // Pass 2: after LazyVStack starts measuring elements
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
+        }
+
+        // Pass 3: lock to bottom after media and fonts are completely sized
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
+            initialScrollDone = true
+        }
+    }
+
+    private func handleMessagesCountChange(proxy: ScrollViewProxy) {
+        if socketManager.didPrependHistory || isPrependingHistory {
+            socketManager.didPrependHistory = false
+            isPrependingHistory = false
+            if let prevTop = previousTopMsgId {
+                proxy.scrollTo(prevTop, anchor: .top)
+            }
+            return
+        }
+
+        if let last = socketManager.chatMessages.last {
+            let lastId = last.msgId ?? 0
+            if lastKnownMessageId != lastId {
+                lastKnownMessageId = lastId
+                DispatchQueue.main.async {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    private func jumpToMessageId(_ targetId: Int, proxy: ScrollViewProxy) {
+        let scrollTag = "msg-\(targetId)"
+        if socketManager.chatMessages.contains(where: { $0.msgId == targetId }) {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                proxy.scrollTo(scrollTag, anchor: .center)
+            }
+            highlightedMsgId = targetId
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation {
+                    if highlightedMsgId == targetId {
+                        highlightedMsgId = nil
+                    }
+                }
+            }
+        } else {
+            socketManager.jumpToMessage(msgId: targetId)
         }
     }
 
@@ -253,17 +350,20 @@ public struct ChatRoomView: View {
         HStack(spacing: 8) {
             Capsule()
                 .fill(Color(hex: "#38BDF8"))
-                .frame(width: 3, height: 32)
+                .frame(width: 3, height: 28)
 
             VStack(alignment: .leading, spacing: 2) {
                 if let rep = replyingToMessage {
                     Text("Replying to \(rep.authorName)")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(Color(hex: "#38BDF8"))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     Text(rep.bodyText.isEmpty ? "[Media]" : rep.bodyText)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11.5))
                         .foregroundColor(Color(hex: "#A1A1AA"))
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
 
@@ -281,7 +381,8 @@ public struct ChatRoomView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .frame(maxHeight: 46)
+        .frame(height: 44)
+        .clipped()
         .background(Color(hex: "#18181B"))
         .border(Color(hex: "#27272A"), width: 0.5)
     }

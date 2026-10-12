@@ -135,10 +135,11 @@ public struct InlineVideoPlayerView: View {
         if player == nil {
             let asset = AVURLAsset(url: videoUrl, options: ["AVURLAssetPreferPreciseDurationAndTimingKey": false])
             let item = AVPlayerItem(asset: asset)
-            item.preferredForwardBufferDuration = 3.0 // Buffer 3 seconds instead of full file
+            item.preferredForwardBufferDuration = 1.0
+            item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
             
             let p = AVPlayer(playerItem: item)
-            p.automaticallyWaitsToMinimizeStalling = true
+            p.automaticallyWaitsToMinimizeStalling = false
             
             self.player = p
             p.isMuted = isMuted
@@ -152,7 +153,7 @@ public struct InlineVideoPlayerView: View {
             }
 
             NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
-                self.player?.seek(to: .zero)
+                self.player?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
                 self.isPlaying = false
                 self.showControls = true
             }
@@ -171,6 +172,9 @@ public struct InlineVideoPlayerView: View {
     }
 
     private func togglePlayPause() {
+        if player == nil {
+            setupPlayer()
+        }
         guard let p = player else { return }
         if isPlaying {
             p.pause()
@@ -186,7 +190,7 @@ public struct InlineVideoPlayerView: View {
 
     private func seek(to seconds: Double) {
         let time = CMTime(seconds: seconds, preferredTimescale: 600)
-        player?.seek(to: time)
+        player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
         currentTime = seconds
     }
 

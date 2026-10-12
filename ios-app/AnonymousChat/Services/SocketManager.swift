@@ -31,6 +31,8 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
     @Published public var onlineMembers: [UserProfile] = []
     @Published public var onlineCount: Int = 0
     @Published public var hasMoreHistory: Bool = false
+    @Published public var jumpedTargetMsgId: Int?
+    @Published public var didPrependHistory: Bool = false
 
     // Explore feed state
     @Published public var explorePosts: [Post] = []
@@ -387,8 +389,31 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
                    let hList = dict["history"] as? [[String: Any]],
                    let hData = try? JSONSerialization.data(withJSONObject: hList),
                    let msgs = try? JSONDecoder().decode([Message].self, from: hData) {
-                    self.chatMessages.insert(contentsOf: msgs, at: 0)
+                    self.didPrependHistory = true
+                    let existingIds = Set(self.chatMessages.compactMap { $0.msgId })
+                    let uniqueNew = msgs.filter { m in
+                        guard let mId = m.msgId else { return true }
+                        return !existingIds.contains(mId)
+                    }
+                    self.chatMessages.insert(contentsOf: uniqueNew, at: 0)
                     self.hasMoreHistory = dict["hasMore"] as? Bool ?? false
+                }
+
+            case "history-jump":
+                if let dict = payload as? [String: Any],
+                   let hList = dict["history"] as? [[String: Any]],
+                   let hData = try? JSONSerialization.data(withJSONObject: hList),
+                   let msgs = try? JSONDecoder().decode([Message].self, from: hData) {
+                    let targetMsgId = dict["targetMsgId"] as? Int ?? 0
+                    var current = self.chatMessages
+                    for m in msgs {
+                        if !current.contains(where: { $0.msgId == m.msgId && (m.msgId ?? 0) > 0 }) {
+                            current.append(m)
+                        }
+                    }
+                    current.sort(by: { ($0.msgId ?? 0) < ($1.msgId ?? 0) })
+                    self.chatMessages = current
+                    self.jumpedTargetMsgId = targetMsgId
                 }
 
             case "message":
@@ -791,6 +816,10 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
 
     public func loadHistory(beforeId: Int) {
         emit(event: "load-history", data: ["beforeId": beforeId])
+    }
+
+    public func jumpToMessage(msgId: Int) {
+        emit(event: "jump-to-msg", data: ["msgId": msgId])
     }
 
     public func requestUserProfile(uid: String) {

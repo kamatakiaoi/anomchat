@@ -2,11 +2,27 @@ import SwiftUI
 
 public struct MessageBubbleView: View, Equatable {
     public let message: Message
+    public let isHighlighted: Bool
     public let onReply: () -> Void
     public let onInspectUser: () -> Void
+    public var onJumpToReply: ((Int) -> Void)?
+
+    public init(
+        message: Message,
+        isHighlighted: Bool = false,
+        onReply: @escaping () -> Void,
+        onInspectUser: @escaping () -> Void,
+        onJumpToReply: ((Int) -> Void)? = nil
+    ) {
+        self.message = message
+        self.isHighlighted = isHighlighted
+        self.onReply = onReply
+        self.onInspectUser = onInspectUser
+        self.onJumpToReply = onJumpToReply
+    }
 
     public static func == (lhs: MessageBubbleView, rhs: MessageBubbleView) -> Bool {
-        return lhs.message == rhs.message
+        return lhs.message == rhs.message && lhs.isHighlighted == rhs.isHighlighted
     }
 
     private let socketManager = SocketManager.shared
@@ -124,30 +140,43 @@ public struct MessageBubbleView: View, Equatable {
     }
 
     private func replyQuoteBox(replyName: String, replyText: String, isSelf: Bool) -> some View {
-        HStack(spacing: 6) {
-            Capsule()
-                .fill(isSelf ? Color.white.opacity(0.8) : Color(hex: "#38BDF8"))
-                .frame(width: 2.5, height: 26)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(replyName)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(isSelf ? .white : Color(hex: "#38BDF8"))
-                    .lineLimit(1)
-                Text(replyText.isEmpty ? "[Media]" : replyText)
-                    .font(.system(size: 11))
-                    .foregroundColor(isSelf ? Color.white.opacity(0.85) : Color(hex: "#A1A1AA"))
-                    .lineLimit(1)
+        Button(action: {
+            if let targetId = message.replyMsgId {
+                onJumpToReply?(targetId)
             }
+        }) {
+            HStack(spacing: 6) {
+                Capsule()
+                    .fill(isSelf ? Color.white.opacity(0.8) : Color(hex: "#38BDF8"))
+                    .frame(width: 2.5, height: 26)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(replyName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(isSelf ? .white : Color(hex: "#38BDF8"))
+                        .lineLimit(1)
+                    Text(replyText.isEmpty ? "[Media]" : replyText)
+                        .font(.system(size: 11))
+                        .foregroundColor(isSelf ? Color.white.opacity(0.85) : Color(hex: "#A1A1AA"))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "arrow.turn.up.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(isSelf ? Color.white.opacity(0.65) : Color(hex: "#71717A"))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isSelf ? Color.white.opacity(0.12) : Color(hex: "#141416"))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelf ? Color.white.opacity(0.2) : Color(hex: "#27272A"), lineWidth: 0.5)
+            )
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(isSelf ? Color.white.opacity(0.12) : Color(hex: "#141416"))
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isSelf ? Color.white.opacity(0.2) : Color(hex: "#27272A"), lineWidth: 0.5)
-        )
+        .buttonStyle(PlainButtonStyle())
     }
 
     private func bubbleContentBox(isSelf: Bool) -> some View {
@@ -220,8 +249,11 @@ public struct MessageBubbleView: View, Equatable {
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(isSelf ? Color.white.opacity(0.15) : Color(hex: "#2C2C2E"), lineWidth: 1)
+                .stroke(isHighlighted ? Color(hex: "#F59E0B") : (isSelf ? Color.white.opacity(0.15) : Color(hex: "#2C2C2E")), lineWidth: isHighlighted ? 2.5 : 1)
         )
+        .shadow(color: isHighlighted ? Color(hex: "#F59E0B").opacity(0.8) : Color.clear, radius: isHighlighted ? 8 : 0)
+        .scaleEffect(isHighlighted ? 1.02 : 1.0)
+        .animation(.easeInOut(duration: 0.25), value: isHighlighted)
         .contextMenu {
             if !message.bodyText.isEmpty {
                 Button(action: {
@@ -245,27 +277,116 @@ public struct MessageBubbleView: View, Equatable {
 public struct AudioMessageView: View {
     public let audioUrl: String
     @ObservedObject var audioPlayer = AudioPlayerManager.shared
+    @State private var isScrubbing: Bool = false
+    @State private var scrubValue: Double = 0
+
+    private var isThisAudioActive: Bool {
+        audioPlayer.currentPlayingUrl == audioUrl
+    }
+
+    private var displayCurrentTime: Double {
+        if isScrubbing { return scrubValue }
+        return isThisAudioActive ? audioPlayer.currentTime : 0
+    }
+
+    private var displayDuration: Double {
+        isThisAudioActive ? max(audioPlayer.duration, 0.1) : 0.1
+    }
 
     public var body: some View {
-        let isCurPlaying = audioPlayer.currentPlayingUrl == audioUrl && audioPlayer.isPlaying
-        HStack(spacing: 8) {
-            Button(action: {
-                audioPlayer.playOrPause(urlStr: audioUrl)
-            }) {
-                Image(systemName: isCurPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(.white)
+        let isCurPlaying = isThisAudioActive && audioPlayer.isPlaying
+
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                // Play / Pause Button
+                Button(action: {
+                    audioPlayer.playOrPause(urlStr: audioUrl)
+                }) {
+                    Image(systemName: isCurPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(Color(hex: "#38BDF8"))
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                // Quick -5s Rewind
+                if isThisAudioActive && audioPlayer.duration > 0 {
+                    Button(action: {
+                        audioPlayer.seekRelative(-5)
+                    }) {
+                        Image(systemName: "gobackward.5")
+                            .font(.system(size: 15))
+                            .foregroundColor(Color(hex: "#A1A1AA"))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+
+                // Interactive Scrubber Slider
+                Slider(
+                    value: Binding(
+                        get: { displayCurrentTime },
+                        set: { newVal in
+                            scrubValue = newVal
+                            if !isScrubbing {
+                                isScrubbing = true
+                            }
+                            if isThisAudioActive {
+                                audioPlayer.seek(toSeconds: newVal)
+                            }
+                        }
+                    ),
+                    in: 0...displayDuration,
+                    onEditingChanged: { editing in
+                        isScrubbing = editing
+                        if !editing && isThisAudioActive {
+                            audioPlayer.seek(toSeconds: scrubValue)
+                        } else if editing && !isThisAudioActive {
+                            audioPlayer.playOrPause(urlStr: audioUrl)
+                        }
+                    }
+                )
+                .accentColor(Color(hex: "#38BDF8"))
+
+                // Quick +5s Forward
+                if isThisAudioActive && audioPlayer.duration > 0 {
+                    Button(action: {
+                        audioPlayer.seekRelative(5)
+                    }) {
+                        Image(systemName: "goforward.5")
+                            .font(.system(size: 15))
+                            .foregroundColor(Color(hex: "#A1A1AA"))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
             }
-            Text("Voice Note")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
+
+            // Duration and label Row
+            HStack {
+                Label("Voice Note", systemImage: "waveform")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color(hex: "#71717A"))
+
+                Spacer()
+
+                Text("\(formatTime(displayCurrentTime)) / \(formatTime(displayDuration))")
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundColor(Color(hex: "#A1A1AA"))
+            }
         }
-        .padding(8)
+        .padding(10)
+        .frame(minWidth: 230, maxWidth: 300)
         .background(Color(hex: "#141416"))
-        .cornerRadius(10)
+        .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(hex: "#27272A"), lineWidth: 1)
         )
+    }
+
+    private func formatTime(_ sec: Double) -> String {
+        guard sec.isFinite && !sec.isNaN && sec >= 0 else { return "00:00" }
+        let total = Int(sec)
+        let m = total / 60
+        let s = total % 60
+        return String(format: "%02d:%02d", m, s)
     }
 }

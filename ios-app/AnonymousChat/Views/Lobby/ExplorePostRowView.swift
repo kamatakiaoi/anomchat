@@ -232,22 +232,7 @@ public struct ExplorePostRowView: View, Equatable {
     }
 
     private func audioPlayerRow(audUrl: URL) -> some View {
-        let isCurPlaying = AudioPlayerManager.shared.currentPlayingUrl == audUrl.absoluteString && AudioPlayerManager.shared.isPlaying
-        return HStack(spacing: 8) {
-            Button(action: {
-                AudioPlayerManager.shared.playOrPause(urlStr: audUrl.absoluteString)
-            }) {
-                Image(systemName: isCurPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(.white)
-            }
-            Text("Audio Track")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
-        }
-        .padding(10)
-        .background(Color(hex: "#1E293B"))
-        .cornerRadius(10)
+        AudioMessageView(audioUrl: audUrl.absoluteString)
     }
 
     private var actionsBar: some View {

@@ -250,26 +250,7 @@ public struct PostDetailView: View {
     }
 
     private func audioPlayerBox(audUrl: URL) -> some View {
-        let isCurPlaying = AudioPlayerManager.shared.currentPlayingUrl == audUrl.absoluteString && AudioPlayerManager.shared.isPlaying
-        return HStack(spacing: 8) {
-            Button(action: {
-                AudioPlayerManager.shared.playOrPause(urlStr: audUrl.absoluteString)
-            }) {
-                Image(systemName: isCurPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 32))
-                    .foregroundColor(.white)
-            }
-            Text("Audio Track")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
-        }
-        .padding(12)
-        .background(Color(hex: "#141416"))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(hex: "#27272A"), lineWidth: 1)
-        )
+        AudioMessageView(audioUrl: audUrl.absoluteString)
     }
 
     private var postActionsBar: some View {
@@ -373,15 +354,16 @@ public struct PostDetailView: View {
                 HStack(spacing: 8) {
                     Capsule()
                         .fill(Color(hex: "#38BDF8"))
-                        .frame(width: 3, height: 32)
+                        .frame(width: 3, height: 28)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Replying to \(rep.authorName)")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(Color(hex: "#38BDF8"))
                             .lineLimit(1)
+                            .truncationMode(.tail)
                         Text(rep.commentBody.isEmpty ? "[Media]" : rep.commentBody)
-                            .font(.system(size: 12))
+                            .font(.system(size: 11.5))
                             .foregroundColor(Color(hex: "#A1A1AA"))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -400,7 +382,8 @@ public struct PostDetailView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .frame(maxHeight: 46)
+                .frame(height: 44)
+                .clipped()
                 .background(Color(hex: "#18181B"))
                 .border(Color(hex: "#27272A"), width: 0.5)
             }

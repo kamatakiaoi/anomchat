@@ -63,8 +63,8 @@ public class NotificationManager: NSObject, ObservableObject, UNUserNotification
 
     // MARK: - Lightning-Fast General Chat Notification Dispatcher
     public func showGeneralNotification(sender: String, message: Message, isAppActive: Bool = true, isGeneralActive: Bool = false) {
-        // Do not notify if user is currently inside and actively viewing General topic
-        if isGeneralActive { return }
+        let isAppActive = UIApplication.shared.applicationState == .active
+        let isCurrentlyViewing = isGeneralActive && isAppActive
 
         var displayBody = message.bodyText
         if displayBody.isEmpty {
@@ -74,42 +74,46 @@ public class NotificationManager: NSObject, ObservableObject, UNUserNotification
             else { displayBody = "[Message]" }
         }
 
-        // 1. Instant Sound & Haptics (0ms latency)
+        // 1. Instant Sound & Haptics (plays even when actively chatting in General)
         if PreferenceManager.shared.isSoundEnabled {
             SoundHelper.shared.playPop()
             impactFeedback.impactOccurred()
             impactFeedback.prepare()
         }
 
-        // 2. In-App Heads-up Notification (Ultra-fast Spring Animation)
-        DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
-                self.activeBanner = InAppNotification(
-                    title: "\(sender) in General",
-                    body: displayBody,
-                    avatar: message.avatar,
-                    color: message.authorColor,
-                    topicName: "General"
-                )
-            }
+        // 2. In-App Heads-up Notification (only when not actively looking at General)
+        if isAppActive && !isCurrentlyViewing {
+            DispatchQueue.main.async {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                    self.activeBanner = InAppNotification(
+                        title: "\(sender) in General",
+                        body: displayBody,
+                        avatar: message.avatar,
+                        color: message.authorColor,
+                        topicName: "General"
+                    )
+                }
 
-            self.bannerTimer?.invalidate()
-            self.bannerTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { [weak self] _ in
-                withAnimation(.easeOut(duration: 0.22)) {
-                    self?.activeBanner = nil
+                self.bannerTimer?.invalidate()
+                self.bannerTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { [weak self] _ in
+                    withAnimation(.easeOut(duration: 0.22)) {
+                        self?.activeBanner = nil
+                    }
                 }
             }
         }
 
-        // 3. System Lockscreen / Notification Center Delivery
-        let content = UNMutableNotificationContent()
-        content.title = "\(sender) in General"
-        content.body = displayBody
-        content.sound = UNNotificationSound.default
-        content.categoryIdentifier = "GENERAL_CHAT"
+        // 3. System Lockscreen / Notification Center Delivery (Active for TrollStore and Background)
+        if !isAppActive || !isCurrentlyViewing {
+            let content = UNMutableNotificationContent()
+            content.title = "\(sender) in General"
+            content.body = displayBody
+            content.sound = UNNotificationSound.default
+            content.categoryIdentifier = "GENERAL_CHAT"
 
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request)
+        }
     }
 
     public func dismissBanner() {

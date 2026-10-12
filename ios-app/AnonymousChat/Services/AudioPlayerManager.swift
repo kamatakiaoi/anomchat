@@ -46,20 +46,21 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         ])
         
         let item = AVPlayerItem(asset: asset)
-        // Stream in chunks rather than trying to download the whole uncompressed file
-        if #available(iOS 10.0, *) {
-            item.preferredForwardBufferDuration = 3.0
-        }
+        // Buffer minimal initial slice (1.0s) so uncompressed WAV/FLAC starts in < 100ms
+        item.preferredForwardBufferDuration = 1.0
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         
-        player = AVPlayer(playerItem: item)
-        player?.automaticallyWaitsToMinimizeStalling = true
-        player?.play()
+        let p = AVPlayer(playerItem: item)
+        // Crucial: do NOT wait for multi-megabyte buffers before starting audio
+        p.automaticallyWaitsToMinimizeStalling = false
+        self.player = p
+        p.play()
         isPlaying = true
 
         NotificationCenter.default.addObserver(self, selector: #selector(playerItemDidReachEnd), name: .AVPlayerItemDidPlayToEndTime, object: item)
 
-        // 0.25s interval is battery efficient and keeps progress bar visually smooth
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] time in
+        // 0.1s observer gives butter-smooth scrubber response without UI lag
+        timeObserver = p.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
             guard let self = self else { return }
             self.currentTime = time.seconds
             if let d = self.player?.currentItem?.duration.seconds, !d.isNaN && d > 0 {
@@ -88,11 +89,22 @@ public class AudioPlayerManager: NSObject, ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
+    public func seek(toSeconds: Double) {
+        guard let player = player else { return }
+        let clamped = max(0, min(duration > 0 ? duration : 3600, toSeconds))
+        self.currentTime = clamped
+        let cmTime = CMTime(seconds: clamped, preferredTimescale: 600)
+        player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
     public func seek(to progress: Double) {
-        guard let player = player, duration > 0 else { return }
-        let target = duration * progress
-        let cmTime = CMTime(seconds: target, preferredTimescale: 600)
-        player.seek(to: cmTime)
+        guard duration > 0 else { return }
+        let target = max(0, min(1.0, progress)) * duration
+        seek(toSeconds: target)
+    }
+
+    public func seekRelative(_ delta: Double) {
+        seek(toSeconds: currentTime + delta)
     }
 
     @objc private func playerItemDidReachEnd() {
