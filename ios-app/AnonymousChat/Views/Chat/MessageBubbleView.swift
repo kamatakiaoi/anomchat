@@ -29,6 +29,7 @@ public struct MessageBubbleView: View, Equatable {
     private let prefs = PreferenceManager.shared
     @State private var showLightbox: Bool = false
     @State private var selectedMediaUrl: URL?
+    @State private var isLightboxVideo: Bool = false
 
     public var isMe: Bool {
         // 1. Persistent Account UID check (most reliable across reloads and multi-devices)
@@ -104,7 +105,7 @@ public struct MessageBubbleView: View, Equatable {
         .padding(.vertical, 3)
         .fullScreenCover(isPresented: $showLightbox) {
             if let u = selectedMediaUrl {
-                LightboxView(mediaUrl: u)
+                LightboxView(mediaUrl: u, isVideo: isLightboxVideo)
             }
         }
     }
@@ -187,6 +188,7 @@ public struct MessageBubbleView: View, Equatable {
                     if let imgUrl = MediaUtils.getFullMediaUrl(serverBaseUrl: prefs.serverBaseUrl, mediaPath: imgPath) {
                         Button(action: {
                             selectedMediaUrl = imgUrl
+                            isLightboxVideo = false
                             showLightbox = true
                         }) {
                             CachedAsyncImage(url: imgUrl) { image in
@@ -212,6 +214,7 @@ public struct MessageBubbleView: View, Equatable {
             if let vid = message.video, let vidUrl = MediaUtils.getFullMediaUrl(serverBaseUrl: prefs.serverBaseUrl, mediaPath: vid) {
                 InlineVideoPlayerView(videoUrl: vidUrl) {
                     selectedMediaUrl = vidUrl
+                    isLightboxVideo = true
                     showLightbox = true
                 }
                 .frame(minWidth: 220, maxWidth: 280)

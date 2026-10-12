@@ -22,6 +22,7 @@ public struct ChatRoomView: View {
     @State private var lastKnownMessageId: Int? = nil
     @State private var isPrependingHistory: Bool = false
     @State private var previousTopMsgId: String? = nil
+    @State private var isJumping: Bool = false
 
     public var isTopicLocked: Bool {
         return socketManager.currentTopic?.isLocked ?? topic.isLocked
@@ -201,106 +202,150 @@ public struct ChatRoomView: View {
 
     private var messageListView: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    if socketManager.hasMoreHistory {
-                        Button(action: {
-                            if let firstMsg = socketManager.chatMessages.first, let fId = firstMsg.msgId {
-                                previousTopMsgId = "msg-\(fId)"
-                                isPrependingHistory = true
-                                socketManager.loadHistory(beforeId: fId)
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        if socketManager.hasMoreHistory && !socketManager.isJumpedHistory {
+                            Button(action: {
+                                if let firstMsg = socketManager.chatMessages.first, let fId = firstMsg.msgId {
+                                    previousTopMsgId = "msg-\(fId)"
+                                    isPrependingHistory = true
+                                    socketManager.loadHistory(beforeId: fId)
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.system(size: 13))
+                                    Text("Load older messages")
+                                        .font(.system(size: 12.5, weight: .semibold))
+                                }
+                                .foregroundColor(Color(hex: "#38BDF8"))
+                                .padding(.vertical, 7)
+                                .padding(.horizontal, 14)
+                                .background(Color(hex: "#18181B"))
+                                .cornerRadius(16)
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#27272A"), lineWidth: 1))
                             }
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 13))
-                                Text("Load older messages")
-                                    .font(.system(size: 12.5, weight: .semibold))
-                            }
-                            .foregroundColor(Color(hex: "#38BDF8"))
-                            .padding(.vertical, 7)
-                            .padding(.horizontal, 14)
-                            .background(Color(hex: "#18181B"))
-                            .cornerRadius(16)
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#27272A"), lineWidth: 1))
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
-                    }
 
-                    ForEach(socketManager.chatMessages) { msg in
-                        let scrollId = msg.msgId != nil ? "msg-\(msg.msgId!)" : msg.id
-                        MessageBubbleView(
-                            message: msg,
-                            isHighlighted: highlightedMsgId != nil && msg.msgId == highlightedMsgId,
-                            onReply: {
-                                withAnimation(.easeInOut(duration: 0.18)) {
-                                    replyingToMessage = msg
+                        ForEach(socketManager.chatMessages) { msg in
+                            let scrollId = msg.msgId != nil ? "msg-\(msg.msgId!)" : msg.id
+                            MessageBubbleView(
+                                message: msg,
+                                isHighlighted: highlightedMsgId != nil && msg.msgId == highlightedMsgId,
+                                onReply: {
+                                    withAnimation(.easeInOut(duration: 0.18)) {
+                                        replyingToMessage = msg
+                                    }
+                                },
+                                onInspectUser: {
+                                    if let uid = msg.uid, !uid.isEmpty {
+                                        socketManager.requestUserProfile(uid: uid)
+                                    } else if let userId = msg.userId, !userId.isEmpty {
+                                        socketManager.requestUserProfile(uid: userId)
+                                    }
+                                },
+                                onJumpToReply: { targetMsgId in
+                                    jumpToMessageId(targetMsgId, proxy: proxy)
                                 }
-                            },
-                            onInspectUser: {
-                                if let uid = msg.uid, !uid.isEmpty {
-                                    socketManager.requestUserProfile(uid: uid)
-                                } else if let userId = msg.userId, !userId.isEmpty {
-                                    socketManager.requestUserProfile(uid: userId)
-                                }
-                            },
-                            onJumpToReply: { targetMsgId in
-                                jumpToMessageId(targetMsgId, proxy: proxy)
-                            }
-                        )
-                        .equatable()
-                        .id(scrollId)
-                    }
+                            )
+                            .equatable()
+                            .id(scrollId)
+                        }
 
-                    // Pinned bottom anchor for absolute true-latest alignment
-                    Color.clear
-                        .frame(height: 1)
-                        .id("BOTTOM_ANCHOR")
+                        // Pinned bottom anchor for absolute true-latest alignment
+                        Color.clear
+                            .frame(height: 1)
+                            .id("BOTTOM_ANCHOR")
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-            }
-            .onTapGesture {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            }
-            .onAppear {
-                performInitialBottomScroll(proxy: proxy)
-            }
-            .onChange(of: socketManager.chatMessages.count) { _ in
-                handleMessagesCountChange(proxy: proxy)
-            }
-            .onChange(of: socketManager.jumpedTargetMsgId) { targetId in
-                if let targetId = targetId {
-                    withAnimation(.easeInOut(duration: 0.35)) {
-                        proxy.scrollTo("msg-\(targetId)", anchor: .center)
-                    }
-                    highlightedMsgId = targetId
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        withAnimation {
-                            if highlightedMsgId == targetId {
-                                highlightedMsgId = nil
+                .onTapGesture {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+                .onAppear {
+                    scrollToBottomReliably(proxy: proxy)
+                }
+                .onChange(of: socketManager.historyLoadedTrigger) { _ in
+                    scrollToBottomReliably(proxy: proxy)
+                }
+                .onChange(of: socketManager.chatMessages.count) { _ in
+                    handleMessagesCountChange(proxy: proxy)
+                }
+                .onChange(of: socketManager.jumpedTargetMsgId) { targetId in
+                    if let targetId = targetId {
+                        isJumping = true
+                        highlightedMsgId = targetId
+                        let scrollTag = "msg-\(targetId)"
+                        scrollMultiplePasses(to: scrollTag, proxy: proxy)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            withAnimation {
+                                if highlightedMsgId == targetId {
+                                    highlightedMsgId = nil
+                                }
                             }
+                            isJumping = false
+                            socketManager.jumpedTargetMsgId = nil
                         }
-                        socketManager.jumpedTargetMsgId = nil
                     }
+                }
+
+                // Floating "Latest Messages" button when user is viewing jumped history
+                if socketManager.isJumpedHistory {
+                    Button(action: {
+                        socketManager.returnToLatestMessages()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: 14, weight: .bold))
+                            Text("Latest messages")
+                                .font(.system(size: 12.5, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
+                        .background(Color(hex: "#007AFF"))
+                        .cornerRadius(20)
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                    }
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 12)
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
         }
     }
 
-    private func performInitialBottomScroll(proxy: ScrollViewProxy) {
-        // Immediate scroll to bottom
+    private func scrollToBottomReliably(proxy: ScrollViewProxy) {
+        guard !isJumping && !socketManager.isJumpedHistory else { return }
+        let lastId = socketManager.chatMessages.last?.msgId
+        let target = lastId != nil ? "msg-\(lastId!)" : "BOTTOM_ANCHOR"
+
+        // Pass 1: immediate
+        proxy.scrollTo(target, anchor: .bottom)
         proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
 
         // Pass 2: after LazyVStack starts measuring elements
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            proxy.scrollTo(target, anchor: .bottom)
             proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
         }
 
-        // Pass 3: lock to bottom after media and fonts are completely sized
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
-            initialScrollDone = true
+        // Pass 3: lock to bottom after fonts & layout compute
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.easeOut(duration: 0.15)) {
+                proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
+            }
+        }
+
+        // Pass 4: final bottom lock once media is sized
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+            withAnimation(.easeOut(duration: 0.1)) {
+                proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
+                initialScrollDone = true
+            }
         }
     }
 
@@ -314,15 +359,32 @@ public struct ChatRoomView: View {
             return
         }
 
+        guard !isJumping && !socketManager.isJumpedHistory else { return }
+
         if let last = socketManager.chatMessages.last {
             let lastId = last.msgId ?? 0
             if lastKnownMessageId != lastId {
                 lastKnownMessageId = lastId
-                DispatchQueue.main.async {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
-                    }
-                }
+                scrollToBottomReliably(proxy: proxy)
+            }
+        }
+    }
+
+    private func scrollMultiplePasses(to tag: String, proxy: ScrollViewProxy) {
+        proxy.scrollTo(tag, anchor: .center)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(tag, anchor: .center)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo(tag, anchor: .center)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                proxy.scrollTo(tag, anchor: .center)
             }
         }
     }
@@ -330,18 +392,19 @@ public struct ChatRoomView: View {
     private func jumpToMessageId(_ targetId: Int, proxy: ScrollViewProxy) {
         let scrollTag = "msg-\(targetId)"
         if socketManager.chatMessages.contains(where: { $0.msgId == targetId }) {
-            withAnimation(.easeInOut(duration: 0.35)) {
-                proxy.scrollTo(scrollTag, anchor: .center)
-            }
+            isJumping = true
             highlightedMsgId = targetId
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            scrollMultiplePasses(to: scrollTag, proxy: proxy)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 withAnimation {
                     if highlightedMsgId == targetId {
                         highlightedMsgId = nil
                     }
                 }
+                isJumping = false
             }
         } else {
+            isJumping = true
             socketManager.jumpToMessage(msgId: targetId)
         }
     }

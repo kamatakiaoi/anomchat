@@ -33,6 +33,8 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
     @Published public var hasMoreHistory: Bool = false
     @Published public var jumpedTargetMsgId: Int?
     @Published public var didPrependHistory: Bool = false
+    @Published public var isJumpedHistory: Bool = false
+    @Published public var historyLoadedTrigger: UUID = UUID()
 
     // Explore feed state
     @Published public var explorePosts: [Post] = []
@@ -383,6 +385,8 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
                     }
                     self.onlineCount = dict["topicOnline"] as? Int ?? dict["online"] as? Int ?? self.onlineMembers.count
                     self.hasMoreHistory = dict["hasMore"] as? Bool ?? false
+                    self.isJumpedHistory = false
+                    self.historyLoadedTrigger = UUID()
                 }
 
             case "topic-online":
@@ -436,14 +440,8 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
                    let hData = try? JSONSerialization.data(withJSONObject: hList),
                    let msgs = try? JSONDecoder().decode([Message].self, from: hData) {
                     let targetMsgId = dict["targetMsgId"] as? Int ?? 0
-                    var current = self.chatMessages
-                    for m in msgs {
-                        if !current.contains(where: { $0.msgId == m.msgId && (m.msgId ?? 0) > 0 }) {
-                            current.append(m)
-                        }
-                    }
-                    current.sort(by: { ($0.msgId ?? 0) < ($1.msgId ?? 0) })
-                    self.chatMessages = current
+                    self.isJumpedHistory = true
+                    self.chatMessages = msgs
                     self.jumpedTargetMsgId = targetMsgId
                 }
 
@@ -851,6 +849,12 @@ public class SocketManager: NSObject, ObservableObject, URLSessionWebSocketDeleg
 
     public func jumpToMessage(msgId: Int) {
         emit(event: "jump-to-msg", data: ["msgId": msgId])
+    }
+
+    public func returnToLatestMessages() {
+        guard let topic = currentTopic else { return }
+        self.isJumpedHistory = false
+        joinTopic(name: topic.name)
     }
 
     public func requestUserProfile(uid: String) {

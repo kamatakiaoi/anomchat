@@ -14,7 +14,11 @@ public struct LightboxView: View {
     public init(mediaUrl: URL, isVideo: Bool = false) {
         self.mediaUrl = mediaUrl
         let path = mediaUrl.absoluteString.lowercased()
-        self.isVideo = isVideo || path.hasSuffix(".mp4") || path.hasSuffix(".mov") || path.hasSuffix(".webm")
+        self.isVideo = isVideo ||
+            path.hasSuffix(".mp4") || path.hasSuffix(".mov") || path.hasSuffix(".webm") ||
+            path.hasSuffix(".mkv") || path.hasSuffix(".m4v") || path.hasSuffix(".ts") ||
+            path.hasSuffix(".3gp") || path.hasSuffix(".avi") ||
+            path.contains("video/") || path.contains("data:video")
     }
 
     public var body: some View {
@@ -24,57 +28,47 @@ public struct LightboxView: View {
             if isVideo {
                 VideoPlayerView(videoUrl: mediaUrl)
             } else {
-                AsyncImage(url: mediaUrl) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .scaleEffect(scale)
-                            .offset(offset)
-                            .gesture(
-                                SimultaneousGesture(
-                                    MagnificationGesture()
-                                        .onChanged { value in
-                                            scale = max(1.0, lastScale * value)
-                                        }
-                                        .onEnded { _ in
-                                            lastScale = scale
-                                            if scale <= 1.0 {
-                                                withAnimation {
-                                                    scale = 1.0
-                                                    lastScale = 1.0
-                                                    offset = .zero
-                                                    lastOffset = .zero
-                                                }
-                                            }
-                                        },
-                                    DragGesture()
-                                        .onChanged { value in
-                                            if scale > 1.0 {
-                                                offset = CGSize(
-                                                    width: lastOffset.width + value.translation.width,
-                                                    height: lastOffset.height + value.translation.height
-                                                )
+                CachedAsyncImage(url: mediaUrl) { image in
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(scale)
+                        .offset(offset)
+                        .gesture(
+                            SimultaneousGesture(
+                                MagnificationGesture()
+                                    .onChanged { value in
+                                        scale = max(1.0, lastScale * value)
+                                    }
+                                    .onEnded { _ in
+                                        lastScale = scale
+                                        if scale <= 1.0 {
+                                            withAnimation {
+                                                scale = 1.0
+                                                lastScale = 1.0
+                                                offset = .zero
+                                                lastOffset = .zero
                                             }
                                         }
-                                        .onEnded { _ in
-                                            lastOffset = offset
+                                    },
+                                DragGesture()
+                                    .onChanged { value in
+                                        if scale > 1.0 {
+                                            offset = CGSize(
+                                                width: lastOffset.width + value.translation.width,
+                                                height: lastOffset.height + value.translation.height
+                                            )
                                         }
-                                )
+                                    }
+                                    .onEnded { _ in
+                                        lastOffset = offset
+                                    }
                             )
-                    case .failure(_):
-                        VStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 32))
-                                .foregroundColor(.gray)
-                            Text("Failed to load image")
-                                .foregroundColor(.gray)
-                        }
-                    default:
-                        ProgressView().tint(.white)
-                    }
+                        )
+                } placeholder: {
+                    ProgressView().tint(.white)
                 }
+            }
 
                 // Top Close Button
                 VStack {

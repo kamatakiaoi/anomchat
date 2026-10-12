@@ -14,6 +14,7 @@ public struct InlineVideoPlayerView: View {
     @State private var isMuted: Bool = false
     @State private var showControls: Bool = true
     @State private var controlsTimer: Timer?
+    @State private var thumbnail: UIImage?
 
     public init(videoUrl: URL, onExpandFullscreen: @escaping () -> Void) {
         self.videoUrl = videoUrl
@@ -24,7 +25,7 @@ public struct InlineVideoPlayerView: View {
         ZStack {
             Color.black
 
-            if let player = player {
+            if let player = player, isPlaying {
                 NativeVideoRepresentable(player: player)
                     .overlay(
                         Color.black.opacity(0.001)
@@ -34,8 +35,46 @@ public struct InlineVideoPlayerView: View {
                     )
             } else {
                 ZStack {
-                    Color(hex: "#18181B")
-                    ProgressView().tint(.white)
+                    if let thumb = thumbnail {
+                        Image(uiImage: thumb)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Color(hex: "#18181B")
+                    }
+
+                    Color.black.opacity(0.35)
+
+                    // Large Center Play Button
+                    Button(action: togglePlayPause) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.black.opacity(0.65))
+                                .frame(width: 52, height: 52)
+                                .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1.5))
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white)
+                                .offset(x: 2)
+                        }
+                    }
+
+                    // Fullscreen expansion button at top right
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button(action: onExpandFullscreen) {
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Color.black.opacity(0.65))
+                                    .clipShape(Circle())
+                            }
+                            .padding(8)
+                        }
+                        Spacer()
+                    }
                 }
             }
 
@@ -125,10 +164,31 @@ public struct InlineVideoPlayerView: View {
         )
         .clipped()
         .onAppear {
-            setupPlayer()
+            generateThumbnail()
         }
         .onDisappear {
             teardownPlayer()
+        }
+    }
+
+    private func generateThumbnail() {
+        if let cached = ImageCache.shared.get(for: videoUrl) {
+            self.thumbnail = cached
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let asset = AVURLAsset(url: self.videoUrl)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 480, height: 360)
+            let time = CMTime(seconds: 0.5, preferredTimescale: 600)
+            if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
+                let img = UIImage(cgImage: cgImage)
+                ImageCache.shared.set(img, for: self.videoUrl)
+                DispatchQueue.main.async {
+                    self.thumbnail = img
+                }
+            }
         }
     }
 

@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.6.10",
+    "date": "2026-10-12",
+    "title": "Reply Jump Anywhere, True Latest Scroll & Media Fixes",
+    "items": [
+      "Fixed message history jump to load and center replied messages regardless of how old they are",
+      "Fixed chat initial load to scroll to the true latest message without getting stuck several messages above",
+      "Fixed video and image media loading and display (support data URI and exotic codecs without failures)",
+      "Eliminated scroll and UI lag by optimizing inline media rendering and video player decoders",
+      "Added floating button to easily return to latest messages from historical jump"
+    ]
+  },
+  {
     "version": "3.6.9",
     "date": "2026-10-12",
     "title": "Instant Connection, Auto-Login & Silent Mode Audio",

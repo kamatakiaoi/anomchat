@@ -7,6 +7,21 @@ public struct MediaUtils {
             return nil
         }
 
+        // 1. Base64 Data URI handling
+        if path.hasPrefix("data:") {
+            if path.hasPrefix("data:video/") {
+                if let fileUrl = saveBase64VideoToTemp(dataUri: path) {
+                    return fileUrl
+                }
+            }
+            return URL(string: path)
+        }
+
+        // 2. Local file URL handling
+        if path.hasPrefix("file://") {
+            return URL(string: path)
+        }
+
         var cleanBase = serverBaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleanBase.isEmpty {
             cleanBase = "http://snow.pikamc.vn:25222"
@@ -41,6 +56,19 @@ public struct MediaUtils {
         }
 
         return nil
+    }
+
+    public static func saveBase64VideoToTemp(dataUri: String) -> URL? {
+        guard let commaIdx = dataUri.firstIndex(of: ",") else { return nil }
+        let b64 = String(dataUri[dataUri.index(after: commaIdx)...])
+        guard let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else { return nil }
+        
+        let hash = abs(b64.prefix(64).hashValue)
+        let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("video_\(hash).mp4")
+        if !FileManager.default.fileExists(atPath: tempFile.path) {
+            try? data.write(to: tempFile, options: .atomic)
+        }
+        return tempFile
     }
 
     public static func compressImageToBase64(_ image: UIImage, maxDimension: CGFloat = 1200, quality: CGFloat = 0.8) -> String? {
