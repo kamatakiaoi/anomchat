@@ -79,7 +79,7 @@ public struct InlineVideoPlayerView: View {
             }
 
             // Controls Overlay
-            if showControls {
+            if showControls && isPlaying {
                 VStack {
                     // Top Right: Fullscreen Expansion Button
                     HStack {

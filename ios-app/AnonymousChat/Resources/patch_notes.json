@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.6.11",
+    "date": "2026-10-15",
+    "title": "Fix Chat Lightbox Black Screen & Image Viewer",
+    "items": [
+      "Fixed critical bug where tapping an image in chat resulted in a black screen without GUI",
+      "Hoisted Lightbox modal presentation to root view container to prevent LazyVStack cell recycling glitches",
+      "Converted base64 images to local temporary cache for instant 0ms rendering and zero memory bloat",
+      "Enhanced Lightbox viewer with interactive pull-down to dismiss, tap background to close, and double-tap zoom",
+      "Fixed inline video player controls overlay appearing when video was paused"
+    ]
+  },
+  {
     "version": "3.6.10",
     "date": "2026-10-12",
     "title": "Reply Jump Anywhere, True Latest Scroll & Media Fixes",

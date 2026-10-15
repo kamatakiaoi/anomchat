@@ -14,7 +14,20 @@ public struct MediaUtils {
                     return fileUrl
                 }
             }
-            return URL(string: path)
+            if path.hasPrefix("data:image/") {
+                if let fileUrl = saveBase64ImageToTemp(dataUri: path) {
+                    return fileUrl
+                }
+            }
+            if let valid = URL(string: path) {
+                return valid
+            }
+            let allowed = CharacterSet.urlQueryAllowed.union(CharacterSet(charactersIn: "%#[]"))
+            if let clean = path.addingPercentEncoding(withAllowedCharacters: allowed),
+               let valid = URL(string: clean) {
+                return valid
+            }
+            return nil
         }
 
         // 2. Local file URL handling
@@ -60,11 +73,42 @@ public struct MediaUtils {
 
     public static func saveBase64VideoToTemp(dataUri: String) -> URL? {
         guard let commaIdx = dataUri.firstIndex(of: ",") else { return nil }
-        let b64 = String(dataUri[dataUri.index(after: commaIdx)...])
+        var b64 = String(dataUri[dataUri.index(after: commaIdx)...])
+        if let decoded = b64.removingPercentEncoding {
+            b64 = decoded
+        }
+        b64 = b64.replacingOccurrences(of: "\n", with: "")
+                 .replacingOccurrences(of: "\r", with: "")
+                 .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else { return nil }
         
         let hash = abs(b64.prefix(64).hashValue)
         let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("video_\(hash).mp4")
+        if !FileManager.default.fileExists(atPath: tempFile.path) {
+            try? data.write(to: tempFile, options: .atomic)
+        }
+        return tempFile
+    }
+
+    public static func saveBase64ImageToTemp(dataUri: String) -> URL? {
+        guard let commaIdx = dataUri.firstIndex(of: ",") else { return nil }
+        var b64 = String(dataUri[dataUri.index(after: commaIdx)...])
+        if let decoded = b64.removingPercentEncoding {
+            b64 = decoded
+        }
+        b64 = b64.replacingOccurrences(of: "\n", with: "")
+                 .replacingOccurrences(of: "\r", with: "")
+                 .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else { return nil }
+
+        var ext = "jpg"
+        let header = dataUri.prefix(upTo: commaIdx).lowercased()
+        if header.contains("png") { ext = "png" }
+        else if header.contains("webp") { ext = "webp" }
+        else if header.contains("gif") { ext = "gif" }
+
+        let hash = abs(b64.prefix(64).hashValue)
+        let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("img_\(hash).\(ext)")
         if !FileManager.default.fileExists(atPath: tempFile.path) {
             try? data.write(to: tempFile, options: .atomic)
         }

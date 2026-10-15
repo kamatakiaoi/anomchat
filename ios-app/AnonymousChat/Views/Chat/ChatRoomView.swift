@@ -23,6 +23,7 @@ public struct ChatRoomView: View {
     @State private var isPrependingHistory: Bool = false
     @State private var previousTopMsgId: String? = nil
     @State private var isJumping: Bool = false
+    @State private var activeLightboxMedia: IdentifiableURL? = nil
 
     public var isTopicLocked: Bool {
         return socketManager.currentTopic?.isLocked ?? topic.isLocked
@@ -74,6 +75,12 @@ public struct ChatRoomView: View {
             EmptyView()
                 .sheet(item: $socketManager.inspectedUserProfile) { userProf in
                     UserProfileSheet(profile: userProf)
+                }
+        )
+        .background(
+            EmptyView()
+                .fullScreenCover(item: $activeLightboxMedia) { item in
+                    LightboxView(mediaUrl: item.url, isVideo: item.isVideo)
                 }
         )
         .onChange(of: selectedImages) { images in
@@ -248,6 +255,9 @@ public struct ChatRoomView: View {
                                 },
                                 onJumpToReply: { targetMsgId in
                                     jumpToMessageId(targetMsgId, proxy: proxy)
+                                },
+                                onOpenMedia: { url, isVideo in
+                                    activeLightboxMedia = IdentifiableURL(url: url, isVideo: isVideo)
                                 }
                             )
                             .equatable()

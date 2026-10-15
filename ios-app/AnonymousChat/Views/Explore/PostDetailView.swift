@@ -12,6 +12,7 @@ public struct PostDetailView: View {
     @State private var showDeleteConfirm: Bool = false
     @State private var showToastMessage: String?
     @State private var activeLightboxUrl: URL?
+    @State private var isLightboxVideo: Bool = false
 
     public var currentPost: Post {
         socketManager.currentPostDetail ?? post
@@ -44,10 +45,10 @@ public struct PostDetailView: View {
         .background(
             EmptyView()
                 .fullScreenCover(item: Binding(
-                    get: { activeLightboxUrl != nil ? IdentifiableURL(url: activeLightboxUrl!) : nil },
+                    get: { activeLightboxUrl != nil ? IdentifiableURL(url: activeLightboxUrl!, isVideo: isLightboxVideo) : nil },
                     set: { if $0 == nil { activeLightboxUrl = nil } }
                 )) { idUrl in
-                    LightboxView(mediaUrl: idUrl.url)
+                    LightboxView(mediaUrl: idUrl.url, isVideo: idUrl.isVideo)
                 }
         )
         .alert("Delete Post", isPresented: $showDeleteConfirm) {
@@ -225,7 +226,10 @@ public struct PostDetailView: View {
             VStack(spacing: 8) {
                 ForEach(currentPost.allImages, id: \.self) { imgPath in
                     if let imgUrl = MediaUtils.getFullMediaUrl(serverBaseUrl: prefs.serverBaseUrl, mediaPath: imgPath) {
-                        Button(action: { activeLightboxUrl = imgUrl }) {
+                        Button(action: {
+                            isLightboxVideo = false
+                            activeLightboxUrl = imgUrl
+                        }) {
                             CachedAsyncImage(url: imgUrl) { image in
                                 image.resizable().scaledToFit()
                             } placeholder: {
@@ -240,6 +244,7 @@ public struct PostDetailView: View {
 
         if let vid = currentPost.video, let vidUrl = MediaUtils.getFullMediaUrl(serverBaseUrl: prefs.serverBaseUrl, mediaPath: vid) {
             InlineVideoPlayerView(videoUrl: vidUrl) {
+                isLightboxVideo = true
                 activeLightboxUrl = vidUrl
             }
         }

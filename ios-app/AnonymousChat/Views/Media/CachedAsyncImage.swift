@@ -40,7 +40,9 @@ public struct CachedAsyncImage<Content: View, Placeholder: View>: View {
             if let uiImage = loadedImage {
                 content(Image(uiImage: uiImage))
             } else if hasFailed {
-                placeholder()
+                Image(systemName: "photo.badge.exclamationmark")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color(hex: "#71717A"))
             } else {
                 placeholder()
                     .onAppear {
@@ -72,7 +74,13 @@ public struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                 let urlStr = url.absoluteString
                 var data: Data?
                 if let commaIdx = urlStr.firstIndex(of: ",") {
-                    let b64 = String(urlStr[urlStr.index(after: commaIdx)...])
+                    var b64 = String(urlStr[urlStr.index(after: commaIdx)...])
+                    if let decoded = b64.removingPercentEncoding {
+                        b64 = decoded
+                    }
+                    b64 = b64.replacingOccurrences(of: "\n", with: "")
+                             .replacingOccurrences(of: "\r", with: "")
+                             .trimmingCharacters(in: .whitespacesAndNewlines)
                     data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters)
                 }
                 self.processImageData(data, for: url)

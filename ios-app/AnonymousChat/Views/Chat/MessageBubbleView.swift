@@ -6,19 +6,22 @@ public struct MessageBubbleView: View, Equatable {
     public let onReply: () -> Void
     public let onInspectUser: () -> Void
     public var onJumpToReply: ((Int) -> Void)?
+    public var onOpenMedia: ((URL, Bool) -> Void)?
 
     public init(
         message: Message,
         isHighlighted: Bool = false,
         onReply: @escaping () -> Void,
         onInspectUser: @escaping () -> Void,
-        onJumpToReply: ((Int) -> Void)? = nil
+        onJumpToReply: ((Int) -> Void)? = nil,
+        onOpenMedia: ((URL, Bool) -> Void)? = nil
     ) {
         self.message = message
         self.isHighlighted = isHighlighted
         self.onReply = onReply
         self.onInspectUser = onInspectUser
         self.onJumpToReply = onJumpToReply
+        self.onOpenMedia = onOpenMedia
     }
 
     public static func == (lhs: MessageBubbleView, rhs: MessageBubbleView) -> Bool {
@@ -27,9 +30,6 @@ public struct MessageBubbleView: View, Equatable {
 
     private let socketManager = SocketManager.shared
     private let prefs = PreferenceManager.shared
-    @State private var showLightbox: Bool = false
-    @State private var selectedMediaUrl: URL?
-    @State private var isLightboxVideo: Bool = false
 
     public var isMe: Bool {
         // 1. Persistent Account UID check (most reliable across reloads and multi-devices)
@@ -103,11 +103,6 @@ public struct MessageBubbleView: View, Equatable {
             }
         }
         .padding(.vertical, 3)
-        .fullScreenCover(isPresented: $showLightbox) {
-            if let u = selectedMediaUrl {
-                LightboxView(mediaUrl: u, isVideo: isLightboxVideo)
-            }
-        }
     }
 
     // MARK: - Subviews
@@ -187,9 +182,7 @@ public struct MessageBubbleView: View, Equatable {
                 ForEach(message.allImages, id: \.self) { imgPath in
                     if let imgUrl = MediaUtils.getFullMediaUrl(serverBaseUrl: prefs.serverBaseUrl, mediaPath: imgPath) {
                         Button(action: {
-                            selectedMediaUrl = imgUrl
-                            isLightboxVideo = false
-                            showLightbox = true
+                            onOpenMedia?(imgUrl, false)
                         }) {
                             CachedAsyncImage(url: imgUrl) { image in
                                 image
@@ -213,9 +206,7 @@ public struct MessageBubbleView: View, Equatable {
             // Attached Video (Inline Player with Fullscreen expand)
             if let vid = message.video, let vidUrl = MediaUtils.getFullMediaUrl(serverBaseUrl: prefs.serverBaseUrl, mediaPath: vid) {
                 InlineVideoPlayerView(videoUrl: vidUrl) {
-                    selectedMediaUrl = vidUrl
-                    isLightboxVideo = true
-                    showLightbox = true
+                    onOpenMedia?(vidUrl, true)
                 }
                 .frame(minWidth: 220, maxWidth: 280)
             }
